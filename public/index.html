@@ -1,56 +1,95 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Chat com Salas</title>
 </head>
 <body>
+    <h2>Chat com Salas</h2>
+
     <label for="username">Nickname:</label>
-    <input type="text" id="username" autocomplete="off" placeholder="Nickname">
-    <br>
+    <input type="text" id="username" placeholder="Seu nome">
+    <br><br>
+
+    <label for="room">Escolha a sala:</label>
+    <select id="room">
+        <option value="Sala1">Sala 1</option>
+        <option value="Sala2">Sala 2</option>
+        <option value="Sala3">Sala 3</option>
+        <option value="Sala4">Sala 4</option>
+    </select>
+    <button id="join">Entrar na sala</button>
     <hr>
-    <ul id='messages'>
-    </ul>
-    <form id="form" action="">
-        <textarea id="input" autocomplete="off" rows="5" cols="100"></textarea><br>
+
+    <ul id="messages"></ul>
+
+    <form id="form" action="" style="display: none;">
+        <textarea id="input" rows="4" cols="80" placeholder="Digite sua mensagem..."></textarea><br>
         <button>Enviar</button>
     </form>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        var socket = io()
+        const socket = io();
+        let currentRoom = "";
 
-        document.getElementById('form').addEventListener('submit',
-            function(e){
+        const form = document.getElementById('form');
+        const input = document.getElementById('input');
+        const usernameInput = document.getElementById('username');
+        const messagesList = document.getElementById('messages');
+
+        document.getElementById('join').addEventListener('click', () => {
+            const selectedRoom = document.getElementById('room').value;
+            const username = usernameInput.value.trim();
+
+            if (!username) {
+                alert("Digite seu nickname antes de entrar na sala.");
+                return;
+            }
+
+            if (currentRoom !== "") {
+                socket.emit('leave room', currentRoom);
+            }
+
+            currentRoom = selectedRoom;
+            socket.emit('join room', currentRoom);
+            form.style.display = 'block';
+            messagesList.innerHTML = '';
+            addMessage(`<i>Você entrou na sala <b>${currentRoom}</b></i>`);
+        });
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = input.value;
+            const username = usernameInput.value;
+            const currentTime = new Date().toLocaleTimeString();
+
+            if (message.trim() !== "") {
+                socket.emit('chat message', {
+                    room: currentRoom,
+                    user: username,
+                    message: message,
+                    time: currentTime
+                });
+                input.value = "";
+            }
+        });
+
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                var message = document.getElementById('input').value;
-                var username = document.getElementById('username').value;
-                var currentTime = new Date().toLocaleTimeString();
-                socket.emit('chat message', {user: username, message: message, time: currentTime})
-                document.getElementById('input').value = ""
-                
+                form.dispatchEvent(new Event('submit'));
             }
-        )
+        });
 
-        document.getElementById('input').addEventListener('keydown',
-            function(e){
-                if(e.key === 'Enter'){
-                    e.preventDefault()
-                    document.getElementById('form').dispatchEvent(new Event('submit'))
-                }
-            }
-        )
+        socket.on('chat message', (data) => {
+            addMessage(`<b>[${data.time}] ${data.user}:</b> ${data.message}`);
+        });
 
-        socket.on('chat message', function(data) {
-            addMessage('<b>[' + data.time + ']' + data.user + ':</b>' + data.message)
-        })
-
-        function addMessage(message){
-            var li = document.createElement('li')
-            li.innerHTML = message
-            document.getElementById('messages').appendChild(li)
+        function addMessage(message) {
+            const li = document.createElement('li');
+            li.innerHTML = message;
+            messagesList.appendChild(li);
         }
     </script>
 </body>
